@@ -1,6 +1,6 @@
-# blorp
-A 'bridge' that allows socket.io websocket connections to be used from (currently) Python via redis and node.js.
-Uses redis and Python's asyncio module.
+# Blorp-python
+Python client implementation for [Blorp](https://github.com/jrdh/blorp).
+Uses async-redis, redis and Python's asyncio module.
 
 ## Todo
 - implement instance switching (i.e. when a python instance shuts down, move the messages to another one if there is one)
