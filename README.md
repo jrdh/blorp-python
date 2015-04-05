@@ -8,7 +8,7 @@ Uses redis and Python's asyncio module.
 - tidy (~)
 - tests
 - investigate using hashes in redis
-- Javascript client library (i.e. in the browser)
+- Javascript client library (i.e. for the browser)
 
 
 ## To think about...
