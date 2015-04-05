@@ -11,11 +11,15 @@ class BaseWebsocketHandler:
         self.app = app
         self.message_queue = asyncio.Queue()
         self.go = True
+        # cache for current session
+        self.session = None
 
     @asyncio.coroutine
     def on_connection(self):
         while self.go:
             message_handler, data = yield from self.message_queue.get()
+            # ensure there is a session for this websocket and cache it
+            self.session = yield from self.app.get_session(self.websocket_id)
             yield from message_handler(self, data)
 
     @asyncio.coroutine
@@ -59,8 +63,6 @@ class BaseWebsocketHandlerRouter:
         for regex, on_message_function in self.app.message_handlers:
             if regex.match(event) and websocket_id in self.websocket_handlers:
                 websocket_handler = self.websocket_handlers[websocket_id]
-                # ensure there is a session for this websocket
-                yield from self.app.get_session(websocket_id)
                 if on_message_function.in_order:
                     # add to message queue for that websocket responder
                     yield from websocket_handler.message_queue.put((on_message_function, data))
