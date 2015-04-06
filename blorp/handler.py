@@ -2,6 +2,7 @@ import asyncio
 
 import asyncio_redis
 import anyjson as json
+import blorp
 
 
 class BaseWebsocketHandler:
@@ -36,7 +37,19 @@ class BaseWebsocketHandler:
                 # send back to the websocket that sent this message to us
                 to_send = (self.websocket_id, ) + to_send
             if len(to_send) == 3:
-                yield from self.app.send_async(*to_send)
+                yield from self.send_message(*to_send)
+
+    @asyncio.coroutine
+    def send_message_back(self, event, message):
+        yield from self.send_message(self.websocket_id, event, message)
+
+    @asyncio.coroutine
+    def send_message_to_all(self, event, message):
+        yield from self.send_message(blorp.ALL_TARGET, event, message)
+
+    @asyncio.coroutine
+    def send_message(self, target, event, message):
+        yield from self.app.send_async(target, event, message)
 
 
 class BaseWebsocketHandlerFactory:
