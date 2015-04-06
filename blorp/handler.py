@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 import asyncio_redis
 import anyjson as json
@@ -28,7 +29,7 @@ class BaseWebsocketHandler:
     @asyncio.coroutine
     def call_handler(self, message_handler, data):
         # ensure there is a session for this websocket and cache it
-        self.session = yield from self.app.get_session(self.websocket_id)
+        self.get_session()
         to_send = yield from message_handler(self, data)
         if to_send and isinstance(to_send, tuple):
             # the to_send tuple has len() 2 or 3 and contains either (event, message) or (target, event, message)
@@ -50,6 +51,35 @@ class BaseWebsocketHandler:
     @asyncio.coroutine
     def send_message(self, target, event, message):
         yield from self.app.send_async(target, event, message)
+
+    @asyncio.coroutine
+    def get_session(self, update_cache=True):
+        session = yield from self.app.get_session(self.websocket_id)
+        if update_cache:
+            self.session = session
+        return session
+
+    @asyncio.coroutine
+    def save_session(self, session=None, update_cache=True):
+        if update_cache and session:
+            self.session = session
+        yield from self.app.save_session(self.websocket_id, self.session)
+
+    @asyncio.coroutine
+    def create_new_session(self, update_cache=True):
+        session = {'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        yield from self.save_session(session=session, update_cache=update_cache)
+        return session
+
+    @asyncio.coroutine
+    def delete_session(self, update_cache=True):
+        yield from self.app.delete_session(self.websocket_id)
+        if update_cache:
+            self.session = None
+
+    @asyncio.coroutine
+    def touch_session(self):
+        yield from self.app.touch_session(self.websocket_id)
 
 
 class BaseWebsocketHandlerFactory:
