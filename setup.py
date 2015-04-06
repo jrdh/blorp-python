@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='Blorp',
-    version='0.2.0',
+    version='0.3.0',
     author='Josh Humphries',
     author_email='jrdhumphries@gmail.com',
     packages=['blorp'],
