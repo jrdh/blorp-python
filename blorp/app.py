@@ -10,6 +10,10 @@ import blorp
 import redis
 
 
+# None implies send to all websocket clients
+ALL_TARGET = None
+
+
 class BlorpApp:
 
     def __init__(self, namespace, host='localhost', port=6379, pool_size=10, handler_cls=blorp.BaseWebsocketHandler,
@@ -111,7 +115,7 @@ class BlorpApp:
         self.sync_pool.rpush(self.keys['out'], blorp.create_message(to, event, data))
 
     def send_sync_to_all(self, event, data):
-        self.send_sync(None, event, data)
+        self.send_sync(ALL_TARGET, event, data)
 
     @asyncio.coroutine
     def send_async(self, to, event, data):
@@ -119,8 +123,7 @@ class BlorpApp:
 
     @asyncio.coroutine
     def send_async_to_all(self, event, data):
-        # None to implies send to all websocket clients
-        yield from self.send_async(None, event, data)
+        yield from self.send_async(ALL_TARGET, event, data)
 
     @asyncio.coroutine
     def save_session(self, websocket_id, session):

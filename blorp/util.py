@@ -1,4 +1,5 @@
 import asyncio
+from functools import wraps
 
 import re
 import anyjson as json
@@ -12,9 +13,12 @@ def on(event_regex, re_flags=0, ordered=True, order=None):
     _handler_counter += 1
 
     def wrap(f):
+        f = asyncio.coroutine(f)
+
         @asyncio.coroutine
+        @wraps(f)
         def wrapped_f(*args):
-            f(*args)
+            return (yield from f(*args))
         wrapped_f.message_handler = True
         wrapped_f.event_regex = re.compile(event_regex, re_flags)
         f.in_order = ordered
@@ -25,6 +29,7 @@ def on(event_regex, re_flags=0, ordered=True, order=None):
 
 
 def json_message(on_message_function):
+    @wraps(on_message_function)
     def _wrapped_on_message_function(responder_instance, message):
         return on_message_function(responder_instance, json.loads(message))
     return _wrapped_on_message_function

@@ -18,13 +18,25 @@ class BaseWebsocketHandler:
     def on_connection(self):
         while self.go:
             message_handler, data = yield from self.message_queue.get()
-            # ensure there is a session for this websocket and cache it
-            self.session = yield from self.app.get_session(self.websocket_id)
-            yield from message_handler(self, data)
+            yield from self.call_handler(message_handler, data)
 
     @asyncio.coroutine
     def on_disconnection(self):
         self.go = False
+
+    @asyncio.coroutine
+    def call_handler(self, message_handler, data):
+        # ensure there is a session for this websocket and cache it
+        self.session = yield from self.app.get_session(self.websocket_id)
+        to_send = yield from message_handler(self, data)
+        if to_send and isinstance(to_send, tuple):
+            # the to_send tuple has len() 2 or 3 and contains either (event, message) or (target, event, message)
+            # if no target is specified (the len() is 2) then we send back to the websocket that sent us the message
+            if len(to_send) == 2:
+                # send back to the websocket that sent this message to us
+                to_send = (self.websocket_id, ) + to_send
+            if len(to_send) == 3:
+                yield from self.app.send_async(*to_send)
 
 
 class BaseWebsocketHandlerFactory:
@@ -68,7 +80,7 @@ class BaseWebsocketHandlerRouter:
                     yield from websocket_handler.message_queue.put((on_message_function, data))
                 else:
                     # run responder immediately
-                    asyncio.async(on_message_function(websocket_handler, data))
+                    asyncio.async(websocket_handler.call_handler(on_message_function, data))
                 break
 
 
