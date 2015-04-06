@@ -81,6 +81,10 @@ class BaseWebsocketHandler:
     def touch_session(self):
         yield from self.app.touch_session(self.websocket_id)
 
+    @asyncio.coroutine
+    def call_blocking(self, f, *args):
+        return (yield from self.app.call_blocking(f, *args))
+
 
 class BaseWebsocketHandlerFactory:
 
