@@ -10,8 +10,7 @@ class WebsocketHandler(blorp.BaseWebsocketHandler):
     def __init__(self, websocket_id, app):
         super().__init__(websocket_id, app)
 
-    @blorp.on('json', ordered=False)
-    @blorp.json_message
+    @blorp.on('json', ordered=False, parse_json=True)
     def on_json(self, message):
         return 'something', {'orig': message, 'new': 'hello {0}!'.format(self.websocket_id)}
 

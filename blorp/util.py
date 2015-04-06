@@ -8,11 +8,13 @@ import anyjson as json
 _handler_counter = 0
 
 
-def on(event_regex, re_flags=0, ordered=True, order=None):
+def on(event_regex, re_flags=0, ordered=True, order=None, parse_json=False):
     global _handler_counter
     _handler_counter += 1
 
     def wrap(f):
+        if parse_json:
+            f = json_message(f)
         f = asyncio.coroutine(f)
 
         @asyncio.coroutine
