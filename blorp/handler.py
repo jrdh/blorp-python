@@ -7,6 +7,7 @@ import blorp
 
 
 class BaseWebsocketHandler:
+    DISCONNECT_MESSAGE = None
 
     def __init__(self, websocket_id, app):
         self.websocket_id = websocket_id
@@ -19,12 +20,15 @@ class BaseWebsocketHandler:
     @asyncio.coroutine
     def on_connection(self):
         while self.go:
-            message_handler, data = yield from self.message_queue.get()
-            yield from self.call_handler(message_handler, data)
+            message = yield from self.message_queue.get()
+            if message == BaseWebsocketHandler.DISCONNECT_MESSAGE:
+                break
+            yield from self.call_handler(*message)
 
     @asyncio.coroutine
     def on_disconnection(self):
         self.go = False
+        yield from self.message_queue.put(BaseWebsocketHandler.DISCONNECT_MESSAGE)
 
     @asyncio.coroutine
     def call_handler(self, message_handler, data):
