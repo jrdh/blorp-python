@@ -1,3 +1,5 @@
+v0.3.1, 10/04/2015 -- Minor bug fix to get sessions correctly before calling the handler
+
 v0.3.0, 06/04/2015 -- New features and fixes as well as splitting Python implementation away from node.js core server.
 
 v0.2.0, 08/03/2015 -- Considerable refactoring to allow class based 'apps' and load balancing of websockets between
