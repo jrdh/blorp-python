@@ -33,7 +33,7 @@ class BaseWebsocketHandler:
     @asyncio.coroutine
     def call_handler(self, message_handler, data):
         # ensure there is a session for this websocket and cache it
-        self.get_session()
+        yield from self.get_session()
         to_send = yield from message_handler(self, data)
         if to_send and isinstance(to_send, tuple):
             # the to_send tuple has len() 2 or 3 and contains either (event, message) or (target, event, message)
