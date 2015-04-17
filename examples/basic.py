@@ -10,20 +10,21 @@ class WebsocketHandler(blorp.BaseWebsocketHandler):
     def __init__(self, websocket_id, app):
         super().__init__(websocket_id, app)
 
-    @blorp.on('json', ordered=False, parse_json=True)
+    @blorp.on('json', ordered=False, parse_json=True, return_event='something')
     def on_json(self, message):
-        return 'something', {'orig': message, 'new': 'hello {0}!'.format(self.websocket_id)}
+        return {'orig': message, 'new': 'hello {0}!'.format(self.websocket_id)}
 
-    @blorp.on('string')
+    @blorp.on('string', return_event='something')
     def on_string(self, message):
         yield from asyncio.sleep(5)
         self.session['string_message_sent'] = True
         yield from self.app.save_session(self.websocket_id, self.session)
-        return 'something', 'Got "{0}" from you!'.format(message)
+        return 'Got "{0}" from you!'.format(message)
 
-    @blorp.on('.*')
+    @blorp.on('.*', return_event='something')
     def on_everything_else(self, message):
-        return blorp.ALL_TARGET, 'something', '{0} sent a message to everyone: "{1}"'.format(self.websocket_id, message)
+        message_for_all = '{0} sent a message to everyone: "{1}"'.format(self.websocket_id, message)
+        return blorp.Response(message_for_all, target=blorp.ALL_TARGET)
 
 
 if __name__ == '__main__':

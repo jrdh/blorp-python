@@ -3,7 +3,7 @@ $(document).ready(function() {
     var objectButton = $('#objectButton');
     var toAll = $('#toAll');
     var theTextBox = $('#theTextBox');
-    var socket = io.connect('http://localhost:3003', {path: '/blorp/socket.io'});
+    var socket = io.connect('/', {path: '/blorp/socket.io'});
 
     socket.on('something', function(msg){
         console.log('message:', msg);

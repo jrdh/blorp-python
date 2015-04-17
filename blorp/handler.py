@@ -34,15 +34,11 @@ class BaseWebsocketHandler:
     def call_handler(self, message_handler, data):
         # ensure there is a session for this websocket and cache it
         yield from self.get_session()
-        to_send = yield from message_handler(self, data)
-        if to_send and isinstance(to_send, tuple):
-            # the to_send tuple has len() 2 or 3 and contains either (event, message) or (target, event, message)
-            # if no target is specified (the len() is 2) then we send back to the websocket that sent us the message
-            if len(to_send) == 2:
-                # send back to the websocket that sent this message to us
-                to_send = (self.websocket_id, ) + to_send
-            if len(to_send) == 3:
-                yield from self.send_message(*to_send)
+        response = yield from message_handler(self, data)
+        if response:
+            if not isinstance(response, blorp.Response):
+                response = blorp.Response(response)
+            yield from response.send(self, message_handler.return_event)
 
     @asyncio.coroutine
     def send_message_back(self, event, message):
