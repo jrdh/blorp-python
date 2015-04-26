@@ -10,57 +10,45 @@ import blorp
 import redis
 
 
-# None implies send to all websocket clients
-ALL_TARGET = None
-
-
 class BlorpApp:
 
-    def __init__(self, namespace, host='localhost', port=6379, pool_size=10, handler_cls=blorp.BaseWebsocketHandler,
-                 session_ttl=1800):
-        self.namespace = namespace
+    def __init__(self, name, host='localhost', port=6379, database=0, pool_size=10, session_ttl=1800,
+                 handler_cls=blorp.BaseWebsocketHandler):
+        self.name = name
         self.host = host
         self.port = port
+        self.database = database
         self.pool_size = pool_size
         self.handler_cls = handler_cls
         self.session_ttl = session_ttl
         self.message_handlers = []
-        self.factory = None
-        self.router = None
-        self.receiver = None
+        self.receiver = blorp.WebsocketReceiver(self)
         self.event_loop = None
         self.thread = None
         self.async_pool = None
         self.sync_pool = None
         self.instance_id = None
-        self.key_prefix = 'blorp:{0}:{1}'.format(self.namespace, '{0}')
+        self.key_prefix = 'blorp:{0}:{1}'.format(self.name, '{0}')
         self.keys = {
             'session': self.key_prefix.format('sessions:{0}'),
             'out': self.key_prefix.format('out'),
-            'instances': self.key_prefix.format('instances'),
-            'queues': self.key_prefix.format('queues:{0}')
+            'control': self.key_prefix.format('control'),
+            'messages': self.key_prefix.format('messages:{0}'),
+            'instances': self.key_prefix.format('instances')
         }
 
     def init_message_handlers(self):
         predicate = lambda m: inspect.isfunction(m) and hasattr(m, 'message_handler') and m.message_handler
-        self.message_handlers = sorted(((func.event_regex, func.original) for _, func in
+        self.message_handlers = sorted(((func.event_regex, func) for _, func in
                                         inspect.getmembers(self.handler_cls, predicate)), key=lambda t: t[1].order)
-
-    def init_handler_factory(self):
-        self.factory = blorp.BaseWebsocketHandlerFactory(self)
-
-    def init_handler_router(self):
-        self.router = blorp.BaseWebsocketHandlerRouter(self)
 
     @asyncio.coroutine
     def init_async_pool(self):
-        self.async_pool = yield from asyncio_redis.Pool.create(host=self.host, port=self.port, poolsize=self.pool_size)
+        self.async_pool = yield from asyncio_redis.Pool.create(host=self.host, port=self.port, poolsize=self.pool_size,
+                                                               db=self.database)
 
     def init_sync_pool(self):
-        self.sync_pool = redis.StrictRedis(host=self.host, port=self.port)
-
-    def register_namespace(self):
-        self.sync_pool.sadd('blorp:namespaces', self.namespace)
+        self.sync_pool = redis.StrictRedis(host=self.host, port=self.port, db=self.database)
 
     def register_instance(self):
         attempts = 0
@@ -68,20 +56,14 @@ class BlorpApp:
             potential_instance_id = uuid.uuid4()
             if self.sync_pool.sadd(self.keys['instances'], potential_instance_id):
                 self.instance_id = potential_instance_id
-                self.keys['queues'] = self.keys['queues'].format(self.instance_id)
                 return
             attempts += 1
 
     def start(self, event_loop=None):
         self.init_message_handlers()
-        self.init_handler_factory()
-        self.init_handler_router()
         self.init_sync_pool()
-        
-        self.register_namespace()
+
         self.register_instance()
-        
-        self.receiver = blorp.WebsocketReceiver(self)
 
         self.event_loop = event_loop
         if not self.event_loop:
@@ -109,13 +91,13 @@ class BlorpApp:
 
         if self.thread:
             self.thread.join(timeout=timeout)
-        self.event_loop.close()
+        self.event_loop.stop()
 
     def send_sync(self, to, event, data):
         self.sync_pool.rpush(self.keys['out'], blorp.create_message(to, event, data))
 
     def send_sync_to_all(self, event, data):
-        self.send_sync(ALL_TARGET, event, data)
+        self.send_sync(blorp.Target.ALL, event, data)
 
     @asyncio.coroutine
     def send_async(self, to, event, data):
@@ -123,7 +105,7 @@ class BlorpApp:
 
     @asyncio.coroutine
     def send_async_to_all(self, event, data):
-        yield from self.send_async(ALL_TARGET, event, data)
+        yield from self.send_async(blorp.Target.ALL, event, data)
 
     @asyncio.coroutine
     def save_session(self, websocket_id, session):

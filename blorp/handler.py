@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from functools import partial
 
 import asyncio_redis
 import anyjson as json
@@ -7,38 +8,44 @@ import blorp
 
 
 class BaseWebsocketHandler:
-    DISCONNECT_MESSAGE = None
 
     def __init__(self, websocket_id, app):
         self.websocket_id = websocket_id
         self.app = app
-        self.message_queue = asyncio.Queue()
-        self.go = True
+        self.queue_key = self.app.keys['messages'].format(self.websocket_id)
+        self.disconnected = False
         # cache for current session
         self.session = None
+        self.redis = None
+        self.types = {'disconnection': self.on_disconnection, 'message': self.on_message}
 
     @asyncio.coroutine
-    def on_connection(self):
-        while self.go:
-            message = yield from self.message_queue.get()
-            if message == BaseWebsocketHandler.DISCONNECT_MESSAGE:
-                break
-            yield from self.call_handler(*message)
+    def listen(self):
+        self.redis = yield from asyncio_redis.Connection.create(host=self.app.host, port=self.app.port,
+                                                                db=self.app.database)
+        while not self.disconnected:
+            message = yield from self.redis.blpop([self.queue_key])
+            parsed_message = json.loads(message.value)
+            yield from self.types[parsed_message['type']](**parsed_message['message'])
 
     @asyncio.coroutine
     def on_disconnection(self):
-        self.go = False
-        yield from self.message_queue.put(BaseWebsocketHandler.DISCONNECT_MESSAGE)
+        yield from self.delete_session()
+        self.disconnected = True
 
     @asyncio.coroutine
-    def call_handler(self, message_handler, data):
-        # ensure there is a session for this websocket and cache it
-        yield from self.get_session()
-        response = yield from message_handler(self, data)
-        if response:
-            if not isinstance(response, blorp.Response):
-                response = blorp.Response(response)
-            yield from response.send(self, message_handler.return_event)
+    def on_message(self, event=None, data=None):
+        if event:
+            for regex, on_message_function in self.app.message_handlers:
+                if regex.match(event):
+                    # ensure there is a session for this websocket and cache it
+                    yield from self.get_session()
+                    response = yield from on_message_function(self, data)
+                    if response:
+                        if not isinstance(response, blorp.Response):
+                            response = blorp.Response(response)
+                        yield from response.send(self, on_message_function.return_event)
+                    break
 
     @asyncio.coroutine
     def send_message_back(self, event, message):
@@ -46,7 +53,7 @@ class BaseWebsocketHandler:
 
     @asyncio.coroutine
     def send_message_to_all(self, event, message):
-        yield from self.send_message(blorp.ALL_TARGET, event, message)
+        yield from self.send_message(blorp.Target.ALL, event, message)
 
     @asyncio.coroutine
     def send_message(self, target, event, message):
@@ -86,70 +93,37 @@ class BaseWebsocketHandler:
         return (yield from self.app.call_blocking(f, *args))
 
 
-class BaseWebsocketHandlerFactory:
-
-    def __init__(self, app):
-        self.app = app
-
-    @asyncio.coroutine
-    def get_new_websocket_handler(self, websocket_id):
-        websocket_handler = self.app.handler_cls(websocket_id, self.app)
-        asyncio.async(websocket_handler.on_connection())
-        return websocket_handler
-
-
-class BaseWebsocketHandlerRouter:
-
-    def __init__(self, app):
-        self.app = app
-        self.websocket_handlers = {}
-        self.async_sender = None
-
-    @asyncio.coroutine
-    def add_websocket_handler(self, websocket_id):
-        yield from self.app.get_session(websocket_id, create=True)
-        self.websocket_handlers[websocket_id] = yield from self.app.factory.get_new_websocket_handler(websocket_id)
-
-    @asyncio.coroutine
-    def remove_websocket_handler(self, websocket_id):
-        if websocket_id in self.websocket_handlers:
-            yield from self.websocket_handlers[websocket_id].on_disconnection()
-            yield from self.app.delete_session(websocket_id)
-            del self.websocket_handlers[websocket_id]
-
-    @asyncio.coroutine
-    def route(self, websocket_id, event, data):
-        for regex, on_message_function in self.app.message_handlers:
-            if regex.match(event) and websocket_id in self.websocket_handlers:
-                websocket_handler = self.websocket_handlers[websocket_id]
-                if on_message_function.in_order:
-                    # add to message queue for that websocket responder
-                    yield from websocket_handler.message_queue.put((on_message_function, data))
-                else:
-                    # run responder immediately
-                    asyncio.async(websocket_handler.call_handler(on_message_function, data))
-                break
-
-
 class WebsocketReceiver:
 
     def __init__(self, app):
         self.app = app
         self.run = True
+        self.handlers = {}
+
+    def create_handler(self, websocket_id):
+        return self.app.handler_cls(websocket_id, self.app)
+
+    def remove_handler(self, websocket_id, _listen_task):
+        del self.handlers[websocket_id]
 
     @asyncio.coroutine
     def message_loop(self):
-        message_receiver = yield from asyncio_redis.Connection.create(host=self.app.host, port=self.app.port)
-
-        message_handlers = {
-            'connection': lambda m: self.app.router.add_websocket_handler(m['websocketId']),
-            'disconnection': lambda m: self.app.router.remove_websocket_handler(m['websocketId']),
-            'message': lambda m: self.app.router.route(m['websocketId'], m['event'], m['data'])
-        }
+        message_receiver = yield from asyncio_redis.Connection.create(host=self.app.host, port=self.app.port,
+                                                                      db=self.app.database)
 
         while self.run:
-            raw_message = yield from message_receiver.blpop([self.app.keys['queues']])
+            raw_message = yield from message_receiver.blpop([self.app.keys['control']])
             message = json.loads(raw_message.value)
-            yield from message_handlers[message['type']](message)
+            
+            action = message['action']
+            if action == 'connection':
+                websocket_id = message['websocketId']
+                handler = self.create_handler(websocket_id)
+                # a task is automatically scheduled when it is created
+                listen_task = asyncio.async(handler.listen(), loop=self.app.event_loop)
+                self.handlers[websocket_id] = (handler, listen_task)
+                listen_task.add_done_callback(partial(self.remove_handler, websocket_id))
+            elif action == 'switch':
+                pass
 
         message_receiver.close()

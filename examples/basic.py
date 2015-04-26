@@ -10,8 +10,9 @@ class WebsocketHandler(blorp.BaseWebsocketHandler):
     def __init__(self, websocket_id, app):
         super().__init__(websocket_id, app)
 
-    @blorp.on('json', ordered=False, parse_json=True, return_event='something')
+    @blorp.on('json', return_event='something')
     def on_json(self, message):
+        print(type(message))
         return {'orig': message, 'new': 'hello {0}!'.format(self.websocket_id)}
 
     @blorp.on('string', return_event='something')
@@ -24,7 +25,7 @@ class WebsocketHandler(blorp.BaseWebsocketHandler):
     @blorp.on('.*', return_event='something')
     def on_everything_else(self, message):
         message_for_all = '{0} sent a message to everyone: "{1}"'.format(self.websocket_id, message)
-        return blorp.Response(message_for_all, target=blorp.ALL_TARGET)
+        return blorp.Response(message_for_all, target=blorp.Target.ALL)
 
 
 if __name__ == '__main__':
