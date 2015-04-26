@@ -93,7 +93,7 @@ class BaseWebsocketHandler:
         return (yield from self.app.call_blocking(f, *args))
 
 
-class WebsocketReceiver:
+class WebsocketControlReceiver:
 
     def __init__(self, app):
         self.app = app
@@ -107,12 +107,12 @@ class WebsocketReceiver:
         del self.handlers[websocket_id]
 
     @asyncio.coroutine
-    def message_loop(self):
-        message_receiver = yield from asyncio_redis.Connection.create(host=self.app.host, port=self.app.port,
+    def control_loop(self):
+        control_receiver = yield from asyncio_redis.Connection.create(host=self.app.host, port=self.app.port,
                                                                       db=self.app.database)
 
         while self.run:
-            raw_message = yield from message_receiver.blpop([self.app.keys['control']])
+            raw_message = yield from control_receiver.blpop([self.app.keys['control']])
             message = json.loads(raw_message.value)
             
             action = message['action']
@@ -126,4 +126,4 @@ class WebsocketReceiver:
             elif action == 'switch':
                 pass
 
-        message_receiver.close()
+        control_receiver.close()

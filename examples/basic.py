@@ -12,7 +12,6 @@ class WebsocketHandler(blorp.BaseWebsocketHandler):
 
     @blorp.on('json', return_event='something')
     def on_json(self, message):
-        print(type(message))
         return {'orig': message, 'new': 'hello {0}!'.format(self.websocket_id)}
 
     @blorp.on('string', return_event='something')
