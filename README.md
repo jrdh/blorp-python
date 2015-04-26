@@ -4,7 +4,6 @@ Uses async-redis, redis and Python's asyncio module.
 
 ## Todo
 - implement instance switching (i.e. when a python instance shuts down, move the messages to another one if there is one)
-- implement dynamic namespaces (using redis keyspace notifcations?)
 - tidy (~)
 - tests
 

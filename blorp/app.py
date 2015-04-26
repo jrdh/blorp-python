@@ -71,7 +71,7 @@ class BlorpApp:
         asyncio.set_event_loop(self.event_loop)
 
         asyncio.async(self.init_async_pool(), loop=self.event_loop)
-        asyncio.async(self.receiver.message_loop(), loop=self.event_loop)
+        asyncio.async(self.receiver.control_loop(), loop=self.event_loop)
 
         self.event_loop.run_forever()
 
@@ -85,6 +85,16 @@ class BlorpApp:
         self.thread.start()
 
     def stop(self, timeout=None):
+        # stop listening on all message queues
+        # make sure all current message handlers complete
+        # send a switch message for each websocket
+        # stop the event loop
+        # close the pools
+        # join the thread (if necessary)
+        
+        
+        
+        
         self.sync_pool.srem(self.keys['instances'], self.instance_id)
         self.event_loop.call_soon_threadsafe(self.event_loop.stop)
         self.async_pool.close()
