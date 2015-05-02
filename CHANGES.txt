@@ -1,3 +1,5 @@
+v0.4.0, 02/05/2015 -- Major overhaul of how redis is used. Removal of internal queues. Shutdown managed correctly with instance switching.
+
 v0.3.1, 10/04/2015 -- Minor bug fix to get sessions correctly before calling the handler
 
 v0.3.0, 06/04/2015 -- New features and fixes as well as splitting Python implementation away from node.js core server.
