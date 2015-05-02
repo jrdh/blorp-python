@@ -22,7 +22,6 @@ class BlorpApp:
         self.handler_cls = handler_cls
         self.session_ttl = session_ttl
         self.message_handlers = []
-        self.receiver = blorp.WebsocketControlReceiver(self)
         self.event_loop = None
         self.thread = None
         self.async_pool = None
@@ -36,6 +35,7 @@ class BlorpApp:
             'messages': self.key_prefix.format('messages:{0}'),
             'instances': self.key_prefix.format('instances')
         }
+        self.receiver = blorp.WebsocketControlReceiver(self)
 
     def init_message_handlers(self):
         predicate = lambda m: inspect.isfunction(m) and hasattr(m, 'message_handler') and m.message_handler
@@ -70,10 +70,13 @@ class BlorpApp:
             self.event_loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.event_loop)
 
-        asyncio.async(self.init_async_pool(), loop=self.event_loop)
-        asyncio.async(self.receiver.control_loop(), loop=self.event_loop)
+        self.event_loop.run_until_complete(self.init_async_pool())
+        self.event_loop.run_until_complete(self.receiver.listen())
 
-        self.event_loop.run_forever()
+        self.sync_pool.srem(self.keys['instances'], self.instance_id)
+        self.async_pool.close()
+        self.event_loop.stop()
+        self.event_loop.close()
 
     def start_in_new_thread(self, event_loop=None, **kwargs):
         self.event_loop = event_loop
@@ -84,21 +87,8 @@ class BlorpApp:
         self.thread = threading.Thread(target=self.start, kwargs=kwargs)
         self.thread.start()
 
-    def stop(self, timeout=None):
-        # stop listening on all message queues
-        # make sure all current message handlers complete
-        # send a switch message for each websocket
-        # stop the event loop
-        # close the pools
-        # join the thread (if necessary)
-
-        self.sync_pool.srem(self.keys['instances'], self.instance_id)
-        self.event_loop.call_soon_threadsafe(self.event_loop.stop)
-        self.async_pool.close()
-
-        if self.thread:
-            self.thread.join(timeout=timeout)
-        self.event_loop.stop()
+    def stop(self):
+        self.event_loop.call_soon_threadsafe(asyncio.async, self.receiver.stop())
 
     def send_sync(self, to, event, data):
         self.sync_pool.rpush(self.keys['out'], blorp.create_message(to, event, data))

@@ -41,4 +41,3 @@ if __name__ == '__main__':
         httpd.shutdown()
         httpd.server_close()
         blorp_app.stop()
-        exit(0)
