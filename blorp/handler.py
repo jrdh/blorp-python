@@ -148,8 +148,6 @@ class WebsocketControlReceiver(QueueHandler):
 
     @asyncio.coroutine
     def listen(self):
-        yield from self.handle_message('{"action": "connection", "websocketId": "lemonade2"}')
-
         # block on the super listening function, once this completes it means we've been asked to stop
         yield from super().listen()
 
