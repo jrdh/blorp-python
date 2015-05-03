@@ -20,4 +20,10 @@ if __name__ == '__main__':
         if text == "stop":
             break
     blorp_app.stop()
-    exit(0)
+
+    # TODO: fix this (all the clean up code is in start, so if we get a keyboard interrupt we don't get a cleanup):
+    # blorp_app2 = blorp.BlorpApp('basic', handler_cls=WebsocketHandler)
+    # try:
+    #     blorp_app2.start()
+    # except KeyboardInterrupt as _e:
+    #     blorp_app2.stop()
