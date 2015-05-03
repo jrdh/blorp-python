@@ -59,15 +59,13 @@ class BlorpApp:
                 return
             attempts += 1
 
-    def start(self, event_loop=None):
+    def start(self):
         self.init_message_handlers()
         self.init_sync_pool()
 
         self.register_instance()
 
-        self.event_loop = event_loop
-        if not self.event_loop:
-            self.event_loop = asyncio.get_event_loop()
+        self.event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.event_loop)
 
         self.event_loop.run_until_complete(self.init_async_pool())
@@ -78,12 +76,7 @@ class BlorpApp:
         self.event_loop.stop()
         self.event_loop.close()
 
-    def start_in_new_thread(self, event_loop=None, daemon=False, **kwargs):
-        self.event_loop = event_loop
-        if not self.event_loop:
-            # we need to make sure the event loop is created in this thread so that we can pass it back
-            self.event_loop = asyncio.get_event_loop()
-        kwargs.update({'event_loop': self.event_loop})
+    def start_in_new_thread(self, daemon=False, **kwargs):
         self.thread = threading.Thread(target=self.start, kwargs=kwargs, daemon=daemon)
         self.thread.start()
 
