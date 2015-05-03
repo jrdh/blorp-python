@@ -1,4 +1,6 @@
-v0.4.1, 02/05/2015 -- Allow daemonizing the blorp thread (for django, specifically)
+v0.4.2, 03/05/2015 -- Fix running multiple blorp apps in a single python process
+
+v0.4.1, 03/05/2015 -- Allow daemonizing the blorp thread (for django, specifically)
 
 v0.4.0, 02/05/2015 -- Major overhaul of how redis is used. Removal of internal queues. Shutdown managed correctly with instance switching.
 
