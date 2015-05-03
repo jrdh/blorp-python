@@ -78,13 +78,13 @@ class BlorpApp:
         self.event_loop.stop()
         self.event_loop.close()
 
-    def start_in_new_thread(self, event_loop=None, **kwargs):
+    def start_in_new_thread(self, event_loop=None, daemon=False, **kwargs):
         self.event_loop = event_loop
         if not self.event_loop:
             # we need to make sure the event loop is created in this thread so that we can pass it back
             self.event_loop = asyncio.get_event_loop()
         kwargs.update({'event_loop': self.event_loop})
-        self.thread = threading.Thread(target=self.start, kwargs=kwargs)
+        self.thread = threading.Thread(target=self.start, kwargs=kwargs, daemon=daemon)
         self.thread.start()
 
     def stop(self):
